@@ -24,34 +24,44 @@ def home():
 @app.route("/pay/notcoin", methods=["POST"])
 def pay_notcoin():
 
+    print("==========================================")
+    print("NEW NOTCOIN PAYMENT REQUEST")
+    print("==========================================")
+
     # ==========================================
-    # BACKEND AUTHENTICATION
+    # BACKEND AUTH
     # ==========================================
 
     auth = request.headers.get("X-Backend-Key")
 
     if not BACKEND_SECRET:
+        print("ERROR: BACKEND_SECRET missing")
+
         return jsonify({
             "ok": False,
             "error": "BACKEND_SECRET is missing on Render"
-        }), 500
+        }), 200
 
     if auth != BACKEND_SECRET:
+        print("ERROR: Invalid backend secret")
+
         return jsonify({
             "ok": False,
             "error": "Invalid backend secret"
-        }), 401
+        }), 200
 
 
     # ==========================================
-    # PT EXCHANGE KEY
+    # PT API KEY
     # ==========================================
 
     if not PT_API_KEY:
+        print("ERROR: PT_EXCHANGE_API_KEY missing")
+
         return jsonify({
             "ok": False,
             "error": "PT_EXCHANGE_API_KEY is missing on Render"
-        }), 500
+        }), 200
 
 
     # ==========================================
@@ -60,11 +70,13 @@ def pay_notcoin():
 
     data = request.get_json(silent=True)
 
+    print("Received data:", data)
+
     if not data:
         return jsonify({
             "ok": False,
             "error": "JSON body is missing"
-        }), 400
+        }), 200
 
 
     wallet = str(
@@ -75,40 +87,45 @@ def pay_notcoin():
 
 
     # ==========================================
-    # WALLET CHECK
+    # WALLET
     # ==========================================
 
     if not wallet:
+
         return jsonify({
             "ok": False,
             "error": "Wallet is required"
-        }), 400
+        }), 200
 
 
     # ==========================================
-    # AMOUNT CHECK
+    # AMOUNT
     # ==========================================
 
     if amount is None:
+
         return jsonify({
             "ok": False,
             "error": "Amount is required"
-        }), 400
+        }), 200
 
     try:
         amount = float(amount)
+
     except:
+
         return jsonify({
             "ok": False,
             "error": "Invalid amount"
-        }), 400
+        }), 200
 
 
     if amount < 15:
+
         return jsonify({
             "ok": False,
             "error": "Minimum withdrawal is 15 NOTCOIN"
-        }), 400
+        }), 200
 
 
     # ==========================================
@@ -124,8 +141,14 @@ def pay_notcoin():
     }
 
 
+    print("Sending request to PT Exchange...")
+    print("Wallet:", wallet)
+    print("Amount:", amount)
+    print("Symbol: NOT")
+
+
     # ==========================================
-    # SEND TO PT EXCHANGE
+    # PT EXCHANGE REQUEST
     # ==========================================
 
     try:
@@ -133,20 +156,46 @@ def pay_notcoin():
         response = requests.post(
             PT_API_URL,
             json=payload,
-            timeout=30
+            timeout=120
         )
 
+        print(
+            "PT Exchange HTTP status:",
+            response.status_code
+        )
+
+        print(
+            "PT Exchange response:",
+            response.text
+        )
+
+    except requests.Timeout:
+
+        print(
+            "ERROR: PT Exchange timed out after 120 seconds"
+        )
+
+        return jsonify({
+            "ok": False,
+            "error": "PT Exchange timed out after 120 seconds"
+        }), 200
+
     except requests.RequestException as e:
+
+        print(
+            "PT Exchange connection error:",
+            str(e)
+        )
 
         return jsonify({
             "ok": False,
             "error": "PT Exchange connection failed",
             "details": str(e)
-        }), 502
+        }), 200
 
 
     # ==========================================
-    # READ PT RESPONSE
+    # READ RESPONSE
     # ==========================================
 
     try:
@@ -166,12 +215,24 @@ def pay_notcoin():
 
     if 200 <= response.status_code < 300:
 
+        print("PAYMENT SUCCESS")
+
         return jsonify({
+
             "ok": True,
-            "status_code": response.status_code,
-            "amount": amount,
-            "wallet": wallet,
-            "gateway": gateway
+
+            "status_code":
+                response.status_code,
+
+            "amount":
+                amount,
+
+            "wallet":
+                wallet,
+
+            "gateway":
+                gateway
+
         }), 200
 
 
@@ -179,13 +240,27 @@ def pay_notcoin():
     # PT EXCHANGE ERROR
     # ==========================================
 
-    return jsonify({
-        "ok": False,
-        "status_code": response.status_code,
-        "error": "PT Exchange rejected the payment",
-        "gateway": gateway
-    }), response.status_code
+    print("PAYMENT FAILED")
 
+    return jsonify({
+
+        "ok": False,
+
+        "status_code":
+            response.status_code,
+
+        "error":
+            "PT Exchange rejected the payment",
+
+        "gateway":
+            gateway
+
+    }), 200
+
+
+# ==========================================
+# START
+# ==========================================
 
 if __name__ == "__main__":
 
